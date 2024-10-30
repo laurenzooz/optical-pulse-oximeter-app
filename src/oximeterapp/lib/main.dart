@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 void main() {
   runApp(const MyApp());
@@ -28,7 +29,7 @@ class MyApp extends StatelessWidget {
         //
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 163, 237, 226)),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF67CCAA)),
         useMaterial3: true,
       ),
       home: const MyHomePage(title: 'Optical Pulse Oximeter'),
