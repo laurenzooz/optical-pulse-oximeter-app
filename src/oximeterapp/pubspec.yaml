@@ -1,5 +1,5 @@
 name: oximeterapp
-description: "A new Flutter project."
+description: "Pulse Oximeter App."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -31,7 +31,9 @@ dependencies:
   flutter:
     sdk: flutter
   
-  flutter_blue_plus: ^1.5.4
+  flutter_blue_plus: ^1.34.2
+  fl_chart: ^0.68.0
+
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

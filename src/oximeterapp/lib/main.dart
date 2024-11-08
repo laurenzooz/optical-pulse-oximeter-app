@@ -1,5 +1,7 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 void main() {
   runApp(const MyApp());
@@ -8,27 +10,11 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Optical Pulse Oximeter',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF67CCAA)),
         useMaterial3: true,
       ),
@@ -40,15 +26,6 @@ class MyApp extends StatelessWidget {
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   final String title;
 
   @override
@@ -56,52 +33,82 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  
+  final List<FlSpot> mockData = [];
+  int counter = 0;
+  Timer? timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startUpdatingData();
+  }
+
+  void _startUpdatingData() {
+    timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      setState(() {
+        // Generate a random value for demonstration purposes
+        double newValue = 60 + Random().nextDouble() * 20;
+
+        // Add the new data point
+        mockData.add(FlSpot(counter.toDouble(), newValue));
+
+        // Keep the list to a fixed size by removing the oldest data point
+        if (mockData.length > 50) {
+          mockData.removeAt(0);
+        }
+
+        // Increment counter for the x-axis
+        counter++;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel(); // Cancel the timer to free resources when not in use
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
         title: Text(widget.title),
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text(
-              'Pulse is: 0',
+            
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  minX: mockData.isNotEmpty ? mockData.first.x : 0,
+                  maxX: mockData.isNotEmpty ? mockData.last.x : 6,
+                  minY: 50, // Fixed y-axis minimum
+                  maxY: 80, // Fixed y-axis maximum
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: mockData,
+                      isCurved: false,
+                      barWidth: 2,
+                      color: const Color(0xFF347A6A),
+                      
+                    ),
+                  ],
+                  titlesData: FlTitlesData(show: false),
+                  gridData: FlGridData(show: false),
+                  borderData: FlBorderData(
+                      show: true, border: Border.all(color: const Color(0xFFC9C9C9))),
+                ),
+              ),
             ),
           ],
         ),
       ),
-      
     );
   }
 }
