@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:math';
-import 'dart:typed_data'; // Import the dart:typed_data library
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:universal_ble/universal_ble.dart';
@@ -36,32 +36,31 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String _connectedDeviceName = 'Unknown';
-  double _floatValue = 0.0;
-  final List<FlSpot> mockData = [];
+  String _receivedValue = 'test'; 
+  //final List<FlSpot> mockData = [];
   int counter = 0;
   Timer? timer;
 
   String searchDeviceName = 'Optical Pulse Oximeter';
   String searchServiceUUID = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88';
-  String searchCharasteristicUUID = '2A37';
+  String searchCharasteristicUUID = '2A37'; 
 
   @override
   void initState() {
     super.initState();
     _initializeBLE();
-    _startUpdatingData();
+
+    UniversalBle.onValueChange = _onCharacteristicValueChange; 
+    //_startUpdatingData();
   }
 
   Future<void> _initializeBLE() async {
-    // 1. Check Bluetooth availability
     AvailabilityState state = await UniversalBle.getBluetoothAvailabilityState();
     if (state != AvailabilityState.poweredOn) {
-      // Handle Bluetooth not enabled
       print('Bluetooth is not enabled');
       return;
     }
 
-    // 2. Start scanning for devices
     UniversalBle.onScanResult = (device) {
       if (device.name == searchDeviceName) {
         _connectToDevice(device);
@@ -73,78 +72,81 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _connectToDevice(BleDevice device) async {
     try {
-      // 3. Connect to the device
       await UniversalBle.connect(device.deviceId);
       setState(() {
         _connectedDeviceName = device.name ?? 'Unknown';
       });
 
-      // 4. Discover services and characteristics
       await UniversalBle.discoverServices(device.deviceId);
-      List<BleService> services = await UniversalBle.discoverServices(device.deviceId);
+      List<BleService> services =
+          await UniversalBle.discoverServices(device.deviceId);
       for (var service in services) {
         if (service.uuid == searchServiceUUID) {
           for (var characteristic in service.characteristics) {
             if (characteristic.uuid == searchCharasteristicUUID) {
-              _readFloatValue(device.deviceId, characteristic.uuid);
+              _readCharacteristicValue(device.deviceId, characteristic.uuid);
             }
           }
         }
       }
     } catch (e) {
-      // Handle connection error
       print('Error connecting to device: $e');
     }
   }
 
-  Future<void> _readFloatValue(String deviceId, String characteristicUuid) async {
+  Future<void> _readCharacteristicValue(
+      String deviceId, String characteristicUuid) async {
     try {
-      // 5. Read the float value
-      Uint8List data = await UniversalBle.readValue(
-      deviceId,
-      searchServiceUUID, // Replace with your service UUID
-      characteristicUuid,
-    );
+      await UniversalBle.setNotifiable(
+        deviceId,
+        searchServiceUUID,
+        characteristicUuid,
+        BleInputProperty.notification,
+      );
+      print('Notifications enabled for characteristic: $characteristicUuid');
 
-      // 6. Convert byte data to float
-      if (data.length == 4) {
-        ByteData byteData = ByteData.view(Uint8List.fromList(data).buffer);
-        double floatValue = byteData.getFloat32(0, Endian.little); // Adjust endianness if needed
-        setState(() {
-          _floatValue = floatValue;
-        });
-      } else {
-        print('Invalid data length for float value');
-      }
     } catch (e) {
-      // Handle read error
-      print('Error reading characteristic: $e');
+      print('Error reading characteristic or setting notifications: $e');
+      setState(() {
+        _receivedValue = 'ERROR reading';
+      });
     }
   }
 
+  void _onCharacteristicValueChange(
+      String deviceId, String characteristicUuid, Uint8List value) {
+    // This callback will be triggered whenever the characteristic value changes
+    if (characteristicUuid == searchCharasteristicUUID) { 
+      String hexString = value.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join(' ');
+      setState(() {
+        _receivedValue = 'Raw Bytes: $hexString';
+      });
+      print('Received data (hex): $hexString');
+    }
+  }
+
+/*
   void _startUpdatingData() {
     timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       setState(() {
-        // Use the _floatValue received from the BLE device
-        double newValue = _floatValue; 
-
-        // Add the new data point
-        mockData.add(FlSpot(counter.toDouble(), newValue));
-
-        // Keep the list to a fixed size by removing the oldest data point
+        mockData.add(FlSpot(counter.toDouble(), _receivedValue));
         if (mockData.length > 50) {
           mockData.removeAt(0);
         }
-
-        // Increment counter for the x-axis
         counter++;
       });
     });
-  }
+  }*/
 
   @override
   void dispose() {
-    timer?.cancel(); // Cancel the timer to free resources when not in use
+    // Disable notifications for the characteristic when the widget is disposed
+    UniversalBle.setNotifiable(
+      _connectedDeviceName, // Assuming this holds the deviceId 
+      searchServiceUUID,
+      searchCharasteristicUUID,
+      BleInputProperty.disabled,
+    );
     super.dispose();
   }
 
@@ -161,30 +163,34 @@ class _MyHomePageState extends State<MyHomePage> {
           children: <Widget>[
             Text('Connected Device: $_connectedDeviceName'),
             const SizedBox(height: 20),
-            SizedBox(
+            Text(
+              'Received Value: $_receivedValue',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            /*SizedBox(
               height: 200,
               child: LineChart(
                 LineChartData(
                   minX: mockData.isNotEmpty ? mockData.first.x : 0,
                   maxX: mockData.isNotEmpty ? mockData.last.x : 6,
-                  minY: 50, // Fixed y-axis minimum
-                  maxY: 80, // Fixed y-axis maximum
+                  minY: 50, 
+                  maxY: 200, 
                   lineBarsData: [
                     LineChartBarData(
                       spots: mockData,
                       isCurved: false,
                       barWidth: 2,
                       color: const Color(0xFF347A6A),
-                      
                     ),
                   ],
                   titlesData: FlTitlesData(show: false),
                   gridData: FlGridData(show: false),
                   borderData: FlBorderData(
-                      show: true, border: Border.all(color: const Color(0xFFC9C9C9))),
+                      show: true,
+                      border: Border.all(color: const Color(0xFFC9C9C9))),
                 ),
               ),
-            ),
+            ),*/
           ],
         ),
       ),
