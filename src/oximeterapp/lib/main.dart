@@ -1,7 +1,10 @@
 import 'dart:typed_data';
+import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 
 void main() {
@@ -44,6 +47,10 @@ class _MyHomePageState extends State<MyHomePage> {
   String searchServiceUUID = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88';
   String searchCharacteristicUUID = '00002a37-0000-1000-8000-00805f9b34fb'; 
 
+  final List<FlSpot> bpmData = [];
+  int counter = 0;
+  Timer? timer;
+
 
   @override
   void initState() {
@@ -52,6 +59,8 @@ class _MyHomePageState extends State<MyHomePage> {
     UniversalBle.onValueChange = _onCharacteristicValueChange;
     UniversalBle.onConnectionChange = _onConnectionChange;
   }
+
+  
 
   Future<void> _initializeBLE() async {
     AvailabilityState state = await UniversalBle.getBluetoothAvailabilityState();
@@ -124,8 +133,22 @@ class _MyHomePageState extends State<MyHomePage> {
 
     setState(() {
       _receivedValue = value[1].toString(); 
+
+
+      // update graph
+
+      // Add the new data point
+      bpmData.add(FlSpot(counter.toDouble(), value[1].toDouble()));
+      // Keep the list to a fixed size by removing the oldest data point
+      if (bpmData.length > 50) {
+        bpmData.removeAt(0);
+      }
+      // Increment counter for the x-axis
+      counter++;
     });
   }
+
+
 
   @override
   void dispose() {
