@@ -177,6 +177,33 @@ class _MyHomePageState extends State<MyHomePage> {
               'Received Value: $_receivedValue',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
+
+            // draw graph
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  minX: bpmData.isNotEmpty ? bpmData.first.x : 0,
+                  maxX: bpmData.isNotEmpty ? bpmData.last.x : 6,
+                  minY: 50, // Fixed y-axis minimum
+                  maxY: 150, // Fixed y-axis maximum
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: bpmData,
+                      isCurved: false,
+                      barWidth: 2,
+                      color: const Color(0xFF347A6A),
+                      
+                    ),
+                  ],
+                  titlesData: FlTitlesData(show: false),
+                  gridData: FlGridData(show: false),
+                  borderData: FlBorderData(
+                      show: true, border: Border.all(color: const Color(0xFFC9C9C9))),
+                ),
+              ),
+            ),
           ],
         ),
       ),
