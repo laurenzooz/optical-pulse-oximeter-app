@@ -1,236 +1,155 @@
-// ignore_for_file: avoid_print
-
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
-
-class ResultWidget extends StatelessWidget {
-  final List<String> results;
-  final Function(int?) onClearTap;
-
-  const ResultWidget({
-    Key? key,
-    required this.results,
-    required this.onClearTap,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
-            itemCount: results.length,
-            itemBuilder: (context, index) {
-              return ListTile(
-                title: Text(results[index]),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete),
-                  onPressed: () => onClearTap(index),
-                ),
-              );
-            },
-          ),
-        ),
-        if (results.isNotEmpty)
-          TextButton(
-            onPressed: () => onClearTap(null),
-            child: const Text('Clear All'),
-          ),
-      ],
-    );
-  }
-}
 
 void main() {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class MyApp extends StatefulWidget {
+  const MyApp({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Optical Pulse Oximeter',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF67CCAA)),
-        useMaterial3: true,
-      ),
-      home: const MyHomePage(title: 'Optical Pulse Oximeter'),
-    );
-  }
+  State<MyApp> createState() => _MyAppState();
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  String _connectedDeviceName = 'Unknown';
-  String _receivedValue = 'Waiting for data...';
+class _MyAppState extends State<MyApp> {
   String _connectionStatus = 'Disconnected';
-
-  // Replace with your actual device name, service UUID, and characteristic UUID
-  String searchDeviceName = 'Optical Pulse Oximeter'; 
-  String searchServiceUUID = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88';
-  String searchCharacteristicUUID = '2A37'; 
-
-  final List<String> _logs = [];
+  final String _targetDeviceName = 'Optical Pulse Oximeter'; // Replace with your device name
+  final String _targetServiceUuid = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88'; // Replace with your service UUID
+  final String _targetCharacteristicUuid = '2A37'; // Replace with your characteristic UUID
+  List<BleDevice> _discoveredDevices = [];
+  final List<String> _receivedDataLogs = [];
 
   @override
   void initState() {
     super.initState();
-    _initializeBLE();
-    UniversalBle.onValueChange = _onCharacteristicValueChange;
     UniversalBle.onConnectionChange = _onConnectionChange;
+    UniversalBle.onValueChange = _onValueChange;
+    UniversalBle.onScanResult = _onScanResult;
+    _checkBluetoothAvailability();
   }
 
-  Future<void> _initializeBLE() async {
+  void _checkBluetoothAvailability() async {
     AvailabilityState state = await UniversalBle.getBluetoothAvailabilityState();
-    if (state != AvailabilityState.poweredOn) {
-      _addLog('Bluetooth is not enabled', '');
-      return;
+    if (state == AvailabilityState.poweredOn) {
+      _startScan();
     }
-
-    UniversalBle.onScanResult = (device) {
-      print("Device found: ${device.name}"); // Log device name
-      if (device.name == searchDeviceName) {
-        _addLog('Device found', device.name);
-        _connectToDevice(device);
-        UniversalBle.stopScan();
+    UniversalBle.onAvailabilityChange = (state) {
+      if (state == AvailabilityState.poweredOn) {
+        _startScan();
       }
     };
-    _addLog('Scanning for devices...', '');
-    UniversalBle.startScan();
   }
 
-  Future<void> _connectToDevice(BleDevice device) async {
-    try {
-      _addLog('Connecting to device...', device.name);
-      await UniversalBle.connect(device.deviceId); 
-      // _discoverServices is now called in _onConnectionChange after successful connection
-    } catch (e) {
-      _addLog('Error connecting to device: $e', '');
+  void _startScan() {
+    UniversalBle.startScan(
+      scanFilter: ScanFilter(
+        withServices: [_targetServiceUuid],
+      ),
+    );
+  }
+
+  void _onScanResult(BleDevice device) {
+    // Check if the device is already in the list
+    if (!_discoveredDevices.any((element) => element.deviceId == device.deviceId)) {
       setState(() {
-        _connectionStatus = 'Error connecting'; 
+        _discoveredDevices.add(device);
+        _receivedDataLogs.add('Discovered device: ${device.name} - ${device.deviceId}');
       });
     }
   }
 
   void _onConnectionChange(String deviceId, bool isConnected, String? error) {
-    _addLog('Connection status changed', isConnected ? 'Connected' : 'Disconnected');
     setState(() {
-      _connectedDeviceName = isConnected ? searchDeviceName : 'Unknown';
       _connectionStatus = isConnected ? 'Connected' : 'Disconnected';
-      if (isConnected) {
-        _discoverServices(deviceId); // Kutsutaan _discoverServices onnistuneen yhteyden jälkeen
-      } else {
-        _receivedValue = 'Waiting for data...';
-      }
+      _receivedDataLogs.add('Connection status changed: $_connectionStatus');
     });
+    if (isConnected) {
+      _discoverServices(deviceId);
+    }
   }
-
 
   Future<void> _discoverServices(String deviceId) async {
     try {
-      _addLog('Discovering services...', '');
       List<BleService> services = await UniversalBle.discoverServices(deviceId);
-      _addLog('Services discovered:', services.length);
-
-      for (var service in services) {
-        if (service.uuid == searchServiceUUID) {
-          _addLog('Found service:', service.uuid);
-          for (var characteristic in service.characteristics) {
-            if (characteristic.uuid == searchCharacteristicUUID) {
-              _addLog('Found characteristic:', characteristic.uuid);
-
-              // Enable notifications 
-              await UniversalBle.setNotifiable(
-                deviceId,
-                searchServiceUUID,
-                searchCharacteristicUUID,
-                BleInputProperty.notification,
-              );
-              _addLog('Notifications enabled for:', characteristic.uuid);
+      for (BleService service in services) {
+        if (service.uuid == _targetServiceUuid) {
+          for (BleCharacteristic characteristic in service.characteristics) {
+            if (characteristic.uuid == _targetCharacteristicUuid) {
+              await UniversalBle.setNotifiable(deviceId, service.uuid, characteristic.uuid, BleInputProperty.notification);
               setState(() {
-                _receivedValue = characteristic.uuid; 
-    });
+                _receivedDataLogs.add('Notification set for characteristic ${characteristic.uuid}');
+              });
             }
           }
         }
       }
     } catch (e) {
-      _addLog('Error discovering services: $e', '');
+      setState(() {
+        _receivedDataLogs.add('Error discovering services: $e');
+      });
     }
   }
 
-  void _onCharacteristicValueChange(
-      String deviceId, String characteristicId, Uint8List value) {
-    print('Raw data received: $value');
-    String receivedString = String.fromCharCodes(value);
-    _addLog('Received data:', receivedString);
-
+  void _onValueChange(String deviceId, String characteristicId, List<int> value) {
+    final dataAsString = String.fromCharCodes(value);
     setState(() {
-      _receivedValue = receivedString; 
+      _receivedDataLogs.add('Raw data: $value');
+      _receivedDataLogs.add('Decoded data: $dataAsString');
     });
   }
 
-  @override
-  void dispose() {
-    UniversalBle.disconnect(_connectedDeviceName);
-    super.dispose();
-  }
-
-  void _addLog(String type, dynamic data) {
-    if (mounted) {
+  Future<void> _connectToDevice() async {
+    try {
+      for (BleDevice device in _discoveredDevices) {
+        if (device.name == _targetDeviceName) {
+          setState(() {
+            _receivedDataLogs.add('Attempting to connect to ${device.name}');
+          });
+          await UniversalBle.connect(device.deviceId);
+          break;
+        }
+      }
+    } catch (e) {
       setState(() {
-        _logs.add('$type: ${data.toString()}');
+        _receivedDataLogs.add('Error connecting to device: $e');
       });
-    } else {
-      print('$type: ${data.toString()}'); // Tulostetaan loki konsoliin, jos setState ei ole mahdollinen
     }
-  
-}
-
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            
-            Text('Connection Status: $_connectionStatus'),
-            Text('Connected Device: $_connectedDeviceName'),
-            const SizedBox(height: 20),
-            Text(
-              'Received Value: $_receivedValue',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('BLE Test App'),
+        ),
+        body: Column(
+          children: [
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Text('Connection Status: $_connectionStatus'),
+                  ElevatedButton(
+                    onPressed: _connectToDevice,
+                    child: const Text('Connect'),
+                  ),
+                ],
+              ),
             ),
-            const Divider(),
-            ResultWidget(
-              results: _logs,
-              onClearTap: (int? index) {
-                setState(() {
-                  if (index != null) {
-                    _logs.removeAt(index);
-                  } else {
-                    _logs.clear();
-                  }
-                });
-              },
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: ListView.builder(
+                  itemCount: _receivedDataLogs.length,
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      title: Text(_receivedDataLogs[index]),
+                    );
+                  },
+                ),
+              ),
             ),
           ],
         ),
