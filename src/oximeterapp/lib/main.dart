@@ -16,7 +16,7 @@ class _MyAppState extends State<MyApp> {
   String _connectionStatus = 'Disconnected';
   final String _targetDeviceName = 'Optical Pulse Oximeter'; // Replace with your device name
   final String _targetServiceUuid = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88'; // Replace with your service UUID
-  final String _targetCharacteristicUuid = '2A37'; // Replace with your characteristic UUID
+  final String _targetCharacteristicUuid = '00002a37-0000-1000-8000-00805f9b34fb'; // Replace with your characteristic UUID
   List<BleDevice> _discoveredDevices = [];
   final List<String> _receivedDataLogs = [];
 
@@ -70,18 +70,46 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _discoverServices(String deviceId) async {
+
+    setState(() {
+        _receivedDataLogs.add('Trying to rediscover');
+      });
     try {
       List<BleService> services = await UniversalBle.discoverServices(deviceId);
-      for (BleService service in services) {
+      for (var service in services) {
+        setState(() {
+        _receivedDataLogs.add(service.uuid);
+      });
         if (service.uuid == _targetServiceUuid) {
-          for (BleCharacteristic characteristic in service.characteristics) {
+          for (var characteristic in service.characteristics) {
             if (characteristic.uuid == _targetCharacteristicUuid) {
-              await UniversalBle.setNotifiable(deviceId, service.uuid, characteristic.uuid, BleInputProperty.notification);
+
               setState(() {
-                _receivedDataLogs.add('Notification set for characteristic ${characteristic.uuid}');
+                _receivedDataLogs.add('Trying to rediscover');
               });
+              // Check if the characteristic supports notification or indication
+            //  if (characteristic.properties.contains(CharacteristicProperty.notify) ||
+              //    characteristic.properties.contains(CharacteristicProperty.indicate)) {
+                await UniversalBle.setNotifiable(
+                  deviceId,
+                  service.uuid,
+                  characteristic.uuid,
+                  BleInputProperty.notification, // or BleInputProperty.indication if supported
+                );
+                setState(() {
+                  _receivedDataLogs.add('Notification set for characteristic ${characteristic.uuid}');
+                });
+             // } else {
+               // setState(() {
+                  _receivedDataLogs.add('Characteristic ${characteristic.uuid} does not support notification/indication');
+                //});
+              //}
             }
           }
+        } else {
+          setState(() {
+                  _receivedDataLogs.add('No device found vittu');
+                });
         }
       }
     } catch (e) {
@@ -134,6 +162,18 @@ class _MyAppState extends State<MyApp> {
                   ElevatedButton(
                     onPressed: _connectToDevice,
                     child: const Text('Connect'),
+                  ),
+                   ElevatedButton(
+                  onPressed: () {
+                    if (_connectionStatus == 'Connected') {
+                      _discoverServices(_discoveredDevices.firstWhere((d) => d.name == _targetDeviceName).deviceId);
+                    } else {
+                      setState(() {
+                        _receivedDataLogs.add('Device not connected. Connect first.');
+                      });
+                    }
+                  },
+                  child: const Text('Rediscover Services'),
                   ),
                 ],
               ),
