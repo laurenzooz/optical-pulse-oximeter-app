@@ -1,9 +1,47 @@
-import 'dart:async';
-import 'dart:math';
+// ignore_for_file: avoid_print
+
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:universal_ble/universal_ble.dart';
+
+class ResultWidget extends StatelessWidget {
+  final List<String> results;
+  final Function(int?) onClearTap;
+
+  const ResultWidget({
+    Key? key,
+    required this.results,
+    required this.onClearTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(
+          child: ListView.builder(
+            itemCount: results.length,
+            itemBuilder: (context, index) {
+              return ListTile(
+                title: Text(results[index]),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete),
+                  onPressed: () => onClearTap(index),
+                ),
+              );
+            },
+          ),
+        ),
+        if (results.isNotEmpty)
+          TextButton(
+            onPressed: () => onClearTap(null),
+            child: const Text('Clear All'),
+          ),
+      ],
+    );
+  }
+}
 
 void main() {
   runApp(const MyApp());
@@ -36,119 +74,131 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String _connectedDeviceName = 'Unknown';
-  String _receivedValue = 'test'; 
-  //final List<FlSpot> mockData = [];
-  int counter = 0;
-  Timer? timer;
+  String _receivedValue = 'Waiting for data...';
+  String _connectionStatus = 'Disconnected';
 
-  String searchDeviceName = 'Optical Pulse Oximeter';
+  // Replace with your actual device name, service UUID, and characteristic UUID
+  String searchDeviceName = 'Optical Pulse Oximeter'; 
   String searchServiceUUID = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88';
-  String searchCharasteristicUUID = '2A37'; 
+  String searchCharacteristicUUID = '2A37'; 
+
+  final List<String> _logs = [];
 
   @override
   void initState() {
     super.initState();
     _initializeBLE();
-
-    UniversalBle.onValueChange = _onCharacteristicValueChange; 
-    //_startUpdatingData();
+    UniversalBle.onValueChange = _onCharacteristicValueChange;
+    UniversalBle.onConnectionChange = _onConnectionChange;
   }
 
   Future<void> _initializeBLE() async {
     AvailabilityState state = await UniversalBle.getBluetoothAvailabilityState();
     if (state != AvailabilityState.poweredOn) {
-      print('Bluetooth is not enabled');
+      _addLog('Bluetooth is not enabled', '');
       return;
     }
 
     UniversalBle.onScanResult = (device) {
+      print("Device found: ${device.name}"); // Log device name
       if (device.name == searchDeviceName) {
+        _addLog('Device found', device.name);
         _connectToDevice(device);
         UniversalBle.stopScan();
       }
     };
+    _addLog('Scanning for devices...', '');
     UniversalBle.startScan();
   }
 
   Future<void> _connectToDevice(BleDevice device) async {
     try {
-      await UniversalBle.connect(device.deviceId);
+      _addLog('Connecting to device...', device.name);
+      await UniversalBle.connect(device.deviceId); 
+      // _discoverServices is now called in _onConnectionChange after successful connection
+    } catch (e) {
+      _addLog('Error connecting to device: $e', '');
       setState(() {
-        _connectedDeviceName = device.name ?? 'Unknown';
+        _connectionStatus = 'Error connecting'; 
       });
+    }
+  }
 
-      await UniversalBle.discoverServices(device.deviceId);
-      List<BleService> services =
-          await UniversalBle.discoverServices(device.deviceId);
+  void _onConnectionChange(String deviceId, bool isConnected, String? error) {
+    _addLog('Connection status changed', isConnected ? 'Connected' : 'Disconnected');
+    setState(() {
+      _connectedDeviceName = isConnected ? searchDeviceName : 'Unknown';
+      _connectionStatus = isConnected ? 'Connected' : 'Disconnected';
+      if (isConnected) {
+        _discoverServices(deviceId); // Kutsutaan _discoverServices onnistuneen yhteyden jälkeen
+      } else {
+        _receivedValue = 'Waiting for data...';
+      }
+    });
+  }
+
+
+  Future<void> _discoverServices(String deviceId) async {
+    try {
+      _addLog('Discovering services...', '');
+      List<BleService> services = await UniversalBle.discoverServices(deviceId);
+      _addLog('Services discovered:', services.length);
+
       for (var service in services) {
         if (service.uuid == searchServiceUUID) {
+          _addLog('Found service:', service.uuid);
           for (var characteristic in service.characteristics) {
-            if (characteristic.uuid == searchCharasteristicUUID) {
-              _readCharacteristicValue(device.deviceId, characteristic.uuid);
+            if (characteristic.uuid == searchCharacteristicUUID) {
+              _addLog('Found characteristic:', characteristic.uuid);
+
+              // Enable notifications 
+              await UniversalBle.setNotifiable(
+                deviceId,
+                searchServiceUUID,
+                searchCharacteristicUUID,
+                BleInputProperty.notification,
+              );
+              _addLog('Notifications enabled for:', characteristic.uuid);
+              setState(() {
+                _receivedValue = characteristic.uuid; 
+    });
             }
           }
         }
       }
     } catch (e) {
-      print('Error connecting to device: $e');
-    }
-  }
-
-  Future<void> _readCharacteristicValue(
-      String deviceId, String characteristicUuid) async {
-    try {
-      await UniversalBle.setNotifiable(
-        deviceId,
-        searchServiceUUID,
-        characteristicUuid,
-        BleInputProperty.notification,
-      );
-      print('Notifications enabled for characteristic: $characteristicUuid');
-
-    } catch (e) {
-      print('Error reading characteristic or setting notifications: $e');
-      setState(() {
-        _receivedValue = 'ERROR reading';
-      });
+      _addLog('Error discovering services: $e', '');
     }
   }
 
   void _onCharacteristicValueChange(
-      String deviceId, String characteristicUuid, Uint8List value) {
-    // This callback will be triggered whenever the characteristic value changes
-    if (characteristicUuid == searchCharasteristicUUID) { 
-      String hexString = value.map((byte) => byte.toRadixString(16).padLeft(2, '0')).join(' ');
-      setState(() {
-        _receivedValue = 'Raw Bytes: $hexString';
-      });
-      print('Received data (hex): $hexString');
-    }
-  }
+      String deviceId, String characteristicId, Uint8List value) {
+    print('Raw data received: $value');
+    String receivedString = String.fromCharCodes(value);
+    _addLog('Received data:', receivedString);
 
-/*
-  void _startUpdatingData() {
-    timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
-      setState(() {
-        mockData.add(FlSpot(counter.toDouble(), _receivedValue));
-        if (mockData.length > 50) {
-          mockData.removeAt(0);
-        }
-        counter++;
-      });
+    setState(() {
+      _receivedValue = receivedString; 
     });
-  }*/
+  }
 
   @override
   void dispose() {
-    // Disable notifications for the characteristic when the widget is disposed
-    UniversalBle.setNotifiable(
-      _connectedDeviceName, // Assuming this holds the deviceId 
-      searchServiceUUID,
-      searchCharasteristicUUID,
-      BleInputProperty.disabled,
-    );
+    UniversalBle.disconnect(_connectedDeviceName);
     super.dispose();
   }
+
+  void _addLog(String type, dynamic data) {
+    if (mounted) {
+      setState(() {
+        _logs.add('$type: ${data.toString()}');
+      });
+    } else {
+      print('$type: ${data.toString()}'); // Tulostetaan loki konsoliin, jos setState ei ole mahdollinen
+    }
+  
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -161,36 +211,27 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            
+            Text('Connection Status: $_connectionStatus'),
             Text('Connected Device: $_connectedDeviceName'),
             const SizedBox(height: 20),
             Text(
               'Received Value: $_receivedValue',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            /*SizedBox(
-              height: 200,
-              child: LineChart(
-                LineChartData(
-                  minX: mockData.isNotEmpty ? mockData.first.x : 0,
-                  maxX: mockData.isNotEmpty ? mockData.last.x : 6,
-                  minY: 50, 
-                  maxY: 200, 
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: mockData,
-                      isCurved: false,
-                      barWidth: 2,
-                      color: const Color(0xFF347A6A),
-                    ),
-                  ],
-                  titlesData: FlTitlesData(show: false),
-                  gridData: FlGridData(show: false),
-                  borderData: FlBorderData(
-                      show: true,
-                      border: Border.all(color: const Color(0xFFC9C9C9))),
-                ),
-              ),
-            ),*/
+            const Divider(),
+            ResultWidget(
+              results: _logs,
+              onClearTap: (int? index) {
+                setState(() {
+                  if (index != null) {
+                    _logs.removeAt(index);
+                  } else {
+                    _logs.clear();
+                  }
+                });
+              },
+            ),
           ],
         ),
       ),
