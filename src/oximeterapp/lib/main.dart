@@ -1,9 +1,8 @@
-// ignore_for_file: avoid_print
-
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
+
 
 void main() {
   runApp(const MyApp());
@@ -35,6 +34,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+
   String _connectedDeviceName = 'Unknown';
   String _receivedValue = 'Waiting for data...';
   String _connectionStatus = 'Disconnected';
@@ -43,6 +43,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String searchDeviceName = 'Optical Pulse Oximeter'; 
   String searchServiceUUID = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88';
   String searchCharacteristicUUID = '00002a37-0000-1000-8000-00805f9b34fb'; 
+
 
   @override
   void initState() {
@@ -133,6 +134,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,7 +146,7 @@ class _MyHomePageState extends State<MyHomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            
+
             Text('Connection Status: $_connectionStatus'),
             Text('Connected Device: $_connectedDeviceName'),
             const SizedBox(height: 20),

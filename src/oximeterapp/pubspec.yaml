@@ -1,4 +1,5 @@
 name: "oximeterapp"
+
 description: "Pulse Oximeter App."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -32,6 +33,7 @@ dependencies:
     sdk: flutter
   
   universal_ble: ^0.13.0
+
   fl_chart: ^0.68.0
 
 
