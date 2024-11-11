@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
@@ -133,16 +132,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
     setState(() {
       
-      //if (value[1] >  40 && value[1] < 180) // dont show values that dont make sense
-      //{
-         _receivedValue = value[1].toString(); 
-      //}
-      //else {
-      //  _receivedValue = 'Waiting for data...';
-      //}
-     
-
-      
+      if (value[2] >  0 && value[1] < 3000) // dont show values that dont make sense
+      {
+         _receivedValue = value[2].toString(); 
+      }
+      else {
+        _receivedValue = 'Waiting for data...';
+      }
 
 
       // update graph
@@ -150,7 +146,7 @@ class _MyHomePageState extends State<MyHomePage> {
       // Add the new data point
       bpmData.add(FlSpot(counter.toDouble(), value[1].toDouble()));
       // Keep the list to a fixed size by removing the oldest data point
-      if (bpmData.length > 50) {
+      if (bpmData.length > 200) {
         bpmData.removeAt(0);
       }
       // Increment counter for the x-axis
@@ -194,10 +190,10 @@ class _MyHomePageState extends State<MyHomePage> {
               height: 200,
               child: LineChart(
                 LineChartData(
-                  minX: bpmData.isNotEmpty ? bpmData.first.x : 0,
-                  maxX: bpmData.isNotEmpty ? bpmData.last.x : 6,
-                  minY: 50, // Fixed y-axis minimum
-                  maxY: 150, // Fixed y-axis maximum
+                  minX: bpmData.isNotEmpty ? bpmData.first.x : 0.0,
+                  maxX: bpmData.isNotEmpty ? bpmData.first.x + 50.0 : 50.0,
+                  minY: 0.0,
+                  maxY: 255.0,
                   lineBarsData: [
                     LineChartBarData(
                       spots: bpmData,
