@@ -1,7 +1,9 @@
 import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 
 void main() {
@@ -44,6 +46,10 @@ class _MyHomePageState extends State<MyHomePage> {
   String searchServiceUUID = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88';
   String searchCharacteristicUUID = '00002a37-0000-1000-8000-00805f9b34fb'; 
 
+  final List<FlSpot> bpmData = [];
+  int counter = 0;
+  Timer? timer;
+
 
   @override
   void initState() {
@@ -52,6 +58,8 @@ class _MyHomePageState extends State<MyHomePage> {
     UniversalBle.onValueChange = _onCharacteristicValueChange;
     UniversalBle.onConnectionChange = _onConnectionChange;
   }
+
+  
 
   Future<void> _initializeBLE() async {
     AvailabilityState state = await UniversalBle.getBluetoothAvailabilityState();
@@ -123,9 +131,30 @@ class _MyHomePageState extends State<MyHomePage> {
     print('Raw data received: $value');
 
     setState(() {
-      _receivedValue = value[1].toString(); 
+      
+      if (value[2] >  0 && value[1] < 3000) // dont show values that dont make sense
+      {
+         _receivedValue = value[2].toString(); 
+      }
+      else {
+        _receivedValue = 'Waiting for data...';
+      }
+
+
+      // update graph
+
+      // Add the new data point
+      bpmData.add(FlSpot(counter.toDouble(), value[1].toDouble()));
+      // Keep the list to a fixed size by removing the oldest data point
+      if (bpmData.length > 200) {
+        bpmData.removeAt(0);
+      }
+      // Increment counter for the x-axis
+      counter++;
     });
   }
+
+
 
   @override
   void dispose() {
@@ -153,6 +182,33 @@ class _MyHomePageState extends State<MyHomePage> {
             Text(
               'Received Value: $_receivedValue',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+
+            // draw graph
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 200,
+              child: LineChart(
+                LineChartData(
+                  minX: bpmData.isNotEmpty ? bpmData.first.x : 0.0,
+                  maxX: bpmData.isNotEmpty ? bpmData.first.x + 50.0 : 50.0,
+                  minY: 0.0,
+                  maxY: 255.0,
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: bpmData,
+                      isCurved: false,
+                      barWidth: 2,
+                      color: const Color(0xFF347A6A),
+                      
+                    ),
+                  ],
+                  titlesData: FlTitlesData(show: false),
+                  gridData: FlGridData(show: false),
+                  borderData: FlBorderData(
+                      show: true, border: Border.all(color: const Color(0xFFC9C9C9))),
+                ),
+              ),
             ),
           ],
         ),
