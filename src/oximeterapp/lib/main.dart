@@ -132,7 +132,17 @@ class _MyHomePageState extends State<MyHomePage> {
     print('Raw data received: $value');
 
     setState(() {
-      _receivedValue = value[1].toString(); 
+      
+      //if (value[1] >  40 && value[1] < 180) // dont show values that dont make sense
+      //{
+         _receivedValue = value[1].toString(); 
+      //}
+      //else {
+      //  _receivedValue = 'Waiting for data...';
+      //}
+     
+
+      
 
 
       // update graph
