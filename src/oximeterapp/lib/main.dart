@@ -46,7 +46,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final List<FlSpot> bpmData = [];
   int counter = 0;
-  Timer? timer;
+  DateTime? lastUpdate;
 
   @override
   void initState() {
@@ -124,31 +124,40 @@ class _MyHomePageState extends State<MyHomePage> {
   
 void _onCharacteristicValueChange(
     String deviceId, String characteristicId, Uint8List value) {
-  print('Raw data received: $value');
+  final currentTime = DateTime.now();
 
-  if (timer == null || !timer!.isActive) {
-    timer = Timer(const Duration(milliseconds: 50), () {
-      setState(() {
-        if (value[2] > 0 &&
-            value[1] < 3000) // dont show values that dont make sense
-        {
-          _receivedValue = value[2].toString();
-        } else {
-          _receivedValue = 'Waiting for data...';
-        }
+  if (value[2] > 0 && value[1] < 3000) {
+    _receivedValue = value[2].toString();
+  } else {
+    _receivedValue = 'Waiting for data...';
+  }
 
-        // Add the new data point
-        bpmData.add(FlSpot(counter.toDouble(), value[1].toDouble()));
-        // Keep the list to a fixed size by removing the oldest data point
-        if (bpmData.length > 200) {
-          bpmData.removeAt(0);
-        }
+  // Check if 50ms have passed since the last update
+  if (lastUpdate == null || currentTime.difference(lastUpdate!).inMilliseconds >= 50) {
+    lastUpdate = currentTime; // Update the last update time
+
+    setState(() {      
+
+      // Add the new data point
+      bpmData.add(FlSpot(counter.toDouble(), value[1].toDouble()));
+      // Keep the list to a fixed size by removing the oldest data point
+      if (bpmData.length > 50) {
+        bpmData.removeAt(0);
+      }
+
+      // Check if we've filled the x-axis range
+      if (counter >= 50) {
+        // Clear the graph and reset counter
+        bpmData.clear();
+        counter = 0;
+      } else {
         // Increment counter for the x-axis
         counter++;
-      });
+      }
     });
   }
 }
+
 
   @override
   void dispose() {
@@ -182,9 +191,10 @@ void _onCharacteristicValueChange(
             SizedBox(
               height: 200,
               child: LineChart(
-                LineChartData(
-                  minX: bpmData.isNotEmpty ? bpmData.first.x : 0.0,
-                  maxX: bpmData.isNotEmpty ? bpmData.first.x + 255.0 : 255.0,
+                LineChartData(       
+                  minX: 0.0,
+                  maxX: 50.0,
+                  
                   minY: 0.0,
                   maxY: 255.0,
                   lineBarsData: [
