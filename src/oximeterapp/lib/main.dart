@@ -168,12 +168,13 @@ void _onCharacteristicValueChange(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            Text('Connection Status: $_connectionStatus'),
-            Text('Connected Device: $_connectedDeviceName'),
+            Text('Connection Status: $_connectionStatus',  style: const TextStyle(color: Colors.white)),
+            Text('Connected Device: $_connectedDeviceName',  style: const TextStyle(color: Colors.white)),
             const SizedBox(height: 20),
             Text(
               '$_receivedValue ❤️',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+              
             ),
 
             // draw graph
