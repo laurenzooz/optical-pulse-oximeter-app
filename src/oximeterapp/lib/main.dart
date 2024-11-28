@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:universal_ble/universal_ble.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-
 void main() {
   runApp(const MyApp());
 }
@@ -36,20 +35,18 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-
   String _connectedDeviceName = 'Unknown';
   String _receivedValue = 'Waiting for data...';
   String _connectionStatus = 'Disconnected';
 
   // Replace with your actual device name, service UUID, and characteristic UUID
-  String searchDeviceName = 'Optical Pulse Oximeter'; 
+  String searchDeviceName = 'Optical Pulse Oximeter';
   String searchServiceUUID = 'adf2a6e6-9b6d-4b5f-a487-77e21aafbc88';
-  String searchCharacteristicUUID = '00002a37-0000-1000-8000-00805f9b34fb'; 
+  String searchCharacteristicUUID = '00002a37-0000-1000-8000-00805f9b34fb';
 
   final List<FlSpot> bpmData = [];
   int counter = 0;
   Timer? timer;
-
 
   @override
   void initState() {
@@ -59,10 +56,9 @@ class _MyHomePageState extends State<MyHomePage> {
     UniversalBle.onConnectionChange = _onConnectionChange;
   }
 
-  
-
   Future<void> _initializeBLE() async {
-    AvailabilityState state = await UniversalBle.getBluetoothAvailabilityState();
+    AvailabilityState state =
+        await UniversalBle.getBluetoothAvailabilityState();
     if (state != AvailabilityState.poweredOn) {
       return;
     }
@@ -79,11 +75,11 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> _connectToDevice(BleDevice device) async {
     try {
-      await UniversalBle.connect(device.deviceId); 
+      await UniversalBle.connect(device.deviceId);
       // _discoverServices is now called in _onConnectionChange after successful connection
     } catch (e) {
       setState(() {
-        _connectionStatus = 'Error connecting'; 
+        _connectionStatus = 'Error connecting';
       });
     }
   }
@@ -93,13 +89,13 @@ class _MyHomePageState extends State<MyHomePage> {
       _connectedDeviceName = isConnected ? searchDeviceName : 'Unknown';
       _connectionStatus = isConnected ? 'Connected' : 'Disconnected';
       if (isConnected) {
-        _discoverServices(deviceId); // Kutsutaan _discoverServices onnistuneen yhteyden jälkeen
+        _discoverServices(
+            deviceId); // Kutsutaan _discoverServices onnistuneen yhteyden jälkeen
       } else {
         _receivedValue = 'Waiting for data...';
       }
     });
   }
-
 
   Future<void> _discoverServices(String deviceId) async {
     try {
@@ -109,7 +105,7 @@ class _MyHomePageState extends State<MyHomePage> {
         if (service.uuid == searchServiceUUID) {
           for (var characteristic in service.characteristics) {
             if (characteristic.uuid == searchCharacteristicUUID) {
-              // Enable notifications 
+              // Enable notifications
               await UniversalBle.setNotifiable(
                 deviceId,
                 searchServiceUUID,
@@ -125,44 +121,40 @@ class _MyHomePageState extends State<MyHomePage> {
       print('Error discovering services: $e');
     }
   }
+  
+void _onCharacteristicValueChange(
+    String deviceId, String characteristicId, Uint8List value) {
+  print('Raw data received: $value');
 
-  void _onCharacteristicValueChange(
-      String deviceId, String characteristicId, Uint8List value) {
-    print('Raw data received: $value');
+  if (timer == null || !timer!.isActive) {
+    timer = Timer(const Duration(milliseconds: 50), () {
+      setState(() {
+        if (value[2] > 0 &&
+            value[1] < 3000) // dont show values that dont make sense
+        {
+          _receivedValue = value[2].toString();
+        } else {
+          _receivedValue = 'Waiting for data...';
+        }
 
-    setState(() {
-      
-      if (value[2] >  0 && value[1] < 3000) // dont show values that dont make sense
-      {
-         _receivedValue = value[2].toString(); 
-      }
-      else {
-        _receivedValue = 'Waiting for data...';
-      }
-
-
-      // update graph
-
-      // Add the new data point
-      bpmData.add(FlSpot(counter.toDouble(), value[1].toDouble()));
-      // Keep the list to a fixed size by removing the oldest data point
-      if (bpmData.length > 200) {
-        bpmData.removeAt(0);
-      }
-      // Increment counter for the x-axis
-      counter++;
+        // Add the new data point
+        bpmData.add(FlSpot(counter.toDouble(), value[1].toDouble()));
+        // Keep the list to a fixed size by removing the oldest data point
+        if (bpmData.length > 200) {
+          bpmData.removeAt(0);
+        }
+        // Increment counter for the x-axis
+        counter++;
+      });
     });
   }
-
-
+}
 
   @override
   void dispose() {
     UniversalBle.disconnect(_connectedDeviceName);
     super.dispose();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -171,17 +163,18 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
       ),
+      backgroundColor: Colors.black,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-
-            Text('Connection Status: $_connectionStatus'),
-            Text('Connected Device: $_connectedDeviceName'),
+            Text('Connection Status: $_connectionStatus',  style: const TextStyle(color: Colors.white)),
+            Text('Connected Device: $_connectedDeviceName',  style: const TextStyle(color: Colors.white)),
             const SizedBox(height: 20),
             Text(
-              'Received Value: $_receivedValue',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              '$_receivedValue ❤️',
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+              
             ),
 
             // draw graph
@@ -191,7 +184,7 @@ class _MyHomePageState extends State<MyHomePage> {
               child: LineChart(
                 LineChartData(
                   minX: bpmData.isNotEmpty ? bpmData.first.x : 0.0,
-                  maxX: bpmData.isNotEmpty ? bpmData.first.x + 50.0 : 50.0,
+                  maxX: bpmData.isNotEmpty ? bpmData.first.x + 255.0 : 255.0,
                   minY: 0.0,
                   maxY: 255.0,
                   lineBarsData: [
@@ -200,13 +193,14 @@ class _MyHomePageState extends State<MyHomePage> {
                       isCurved: false,
                       barWidth: 2,
                       color: const Color(0xFF347A6A),
-                      
+                      dotData: FlDotData(show: false)
                     ),
                   ],
                   titlesData: FlTitlesData(show: false),
                   gridData: FlGridData(show: false),
                   borderData: FlBorderData(
-                      show: true, border: Border.all(color: const Color(0xFFC9C9C9))),
+                      show: true,
+                      border: Border.all(color: const Color(0xFFC9C9C9))),
                 ),
               ),
             ),
