@@ -46,6 +46,13 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final List<FlSpot> bpmData = [];
   int counter = 0;
+  int graphMaxSize = 8192;
+  int graphDrawnSize = 80;
+
+  double currentMinX = 0.0;
+  double currentMaxX = 80.0; // Initial range
+
+
   DateTime? lastUpdate;
 
   @override
@@ -126,34 +133,30 @@ void _onCharacteristicValueChange(
     String deviceId, String characteristicId, Uint8List value) {
   final currentTime = DateTime.now();
 
-  if (value[2] > 0 && value[1] < 3000) {
+  if (value[2] > 0 && value[1] < 255) {
     _receivedValue = value[2].toString();
   } else {
     _receivedValue = 'Waiting for data...';
   }
 
   // Check if 50ms have passed since the last update
-  if (lastUpdate == null || currentTime.difference(lastUpdate!).inMilliseconds >= 50) {
+  if (lastUpdate == null || currentTime.difference(lastUpdate!).inMilliseconds >= 20) {
     lastUpdate = currentTime; // Update the last update time
 
     setState(() {      
+      counter++;
 
       // Add the new data point
       bpmData.add(FlSpot(counter.toDouble(), value[1].toDouble()));
       // Keep the list to a fixed size by removing the oldest data point
-      if (bpmData.length > 50) {
+      if (bpmData.length > graphMaxSize) {
         bpmData.removeAt(0);
       }
 
-      // Check if we've filled the x-axis range
-      if (counter >= 50) {
-        // Clear the graph and reset counter
-        bpmData.clear();
-        counter = 0;
-      } else {
-        // Increment counter for the x-axis
-        counter++;
-      }
+      if (counter > graphDrawnSize) {
+          currentMinX += 1; // Increment minX gradually
+          currentMaxX += 1; // Increment maxX gradually
+        }
     });
   }
 }
@@ -192,20 +195,19 @@ void _onCharacteristicValueChange(
               height: 200,
               child: LineChart(
                 LineChartData(       
-                  minX: 0.0,
-                  maxX: 50.0,
-                  
-                  minY: 0.0,
-                  maxY: 255.0,
+                  minX: currentMinX,
+                  maxX: currentMaxX,
+                  minY: -20.0,
+                  maxY: 320.0,
                   lineBarsData: [
-                    LineChartBarData(
-                      spots: bpmData,
-                      isCurved: false,
-                      barWidth: 2,
-                      color: const Color(0xFF347A6A),
-                      dotData: FlDotData(show: false)
-                    ),
-                  ],
+                  LineChartBarData(
+                    spots: bpmData,
+                    isCurved: false,
+                    barWidth: 2,
+                    color: const Color.fromARGB(255, 121, 173, 161),
+                    dotData: FlDotData(show: false),
+                  ),
+                ],
                   titlesData: FlTitlesData(show: false),
                   gridData: FlGridData(show: false),
                   borderData: FlBorderData(
